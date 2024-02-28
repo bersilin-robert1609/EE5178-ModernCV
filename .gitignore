@@ -2,3 +2,6 @@
 .conda/
 .vscode/
 EE5179-Final/
+data/
+wandb/
+wandb*
