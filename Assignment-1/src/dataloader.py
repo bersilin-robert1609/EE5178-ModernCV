@@ -4,11 +4,6 @@ import torch.utils.data as dataloader
 import numpy as np
 import torchvision.datasets as datasets
 
-transform = v2.Compose([
-    v2.ToImage(),
-    v2.ToDtype(torch.float32, scale=True),
-])
-
 # Loading the CIFAR-10 dataset
 def load_data(transform: v2.Compose):
     '''

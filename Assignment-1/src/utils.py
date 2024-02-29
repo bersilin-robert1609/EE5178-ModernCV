@@ -5,7 +5,7 @@ from torchvision import datasets
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
-from src.configs import LABELS
+from src.global_configs import LABELS
 
 
 def get_accuracy(model: nn.Module, data_loader: dataloader, device: torch.device) -> float:
@@ -77,7 +77,6 @@ def plot_confusion_matrix(y_true, y_pred):
     cm = confusion_matrix(y_true, y_pred)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=LABELS.values())
     disp.plot(cmap='Blues', xticks_rotation='vertical')
-
 
 # Plot the training and validation losses
 def plot_accuracies(train_acc, val_acc):

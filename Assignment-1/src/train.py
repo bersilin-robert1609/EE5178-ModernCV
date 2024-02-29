@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from src.utils import get_accuracy
-from src.configs import PROJECT_NAME, PROJECT_ENTITY
+from src.global_configs import PROJECT_NAME, PROJECT_ENTITY
 
 # Training the model
 def train(configs,
@@ -68,8 +68,8 @@ def train(configs,
 
         print(f'Epoch {epoch + 1}, Validation Loss: {val_loss / len(val_loader)}')
 
-        train_accuracy = get_accuracy(model, train_loader)
-        val_accuracy = get_accuracy(model, val_loader)
+        train_accuracy = get_accuracy(model, train_loader, device)
+        val_accuracy = get_accuracy(model, val_loader, device)
 
         train_accuracies.append(train_accuracy)
         val_accuracies.append(val_accuracy)

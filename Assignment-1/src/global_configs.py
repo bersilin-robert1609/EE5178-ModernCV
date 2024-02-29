@@ -19,13 +19,3 @@ LABELS = {
     8: 'ship',
     9: 'truck'
 }
-
-configs = {
-    'batch_size': 100,
-    'learning_rate': 0.07,
-    'num_epochs': 10,
-    'momentum': 0.9,
-
-    'wandb_log': False,
-    'batch_norm': False
-}
