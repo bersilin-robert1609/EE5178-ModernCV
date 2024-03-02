@@ -14,8 +14,9 @@ print(device)
 
 import wandb
 
-PROJECT_NAME = 'mlp_cifar10_pytorch'
+PROJECT_NAME = 'cnn_vgg11_cifar10_pytorch'
 PROJECT_ENTITY = 'cs20b013-bersilin'
+
 
 LABELS = {
     0: 'airplane',
@@ -30,9 +31,9 @@ LABELS = {
     9: 'truck'
 }
 
-ARCH = [500, 250, 100]
+# VGG - 11 Arch
+ARCH = [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M']
 DATA_DIR = "../data"
-
 
 def get_transform(mean, std):
     '''
@@ -43,7 +44,6 @@ def get_transform(mean, std):
         v2.ToDtype(torch.float32, scale=True),
         v2.Normalize(mean, std)
     ])
-
 
 def get_dataloader(batch_size: int, val_split: float = 0.2, shuffle: bool = True):
     '''
@@ -70,7 +70,6 @@ def get_dataloader(batch_size: int, val_split: float = 0.2, shuffle: bool = True
 
     return train_data, test_data, train_loader, val_loader, test_loader
 
-
 def show_random_image(dataset: datasets.CIFAR10, index: int = None):
     '''
     Shows a random image from the dataset
@@ -83,10 +82,10 @@ def show_random_image(dataset: datasets.CIFAR10, index: int = None):
     image, label = dataset[index]
     
     plot = plt.imshow(image.permute(1, 2, 0))
-    plt.title("True Label:", LABELS[label])
+    plt.title(f"True Label: {LABELS[label]}")
+    plt.show()
 
     return plot, index, label
-
 
 def plot_accuracies(train_acc, val_acc):
     '''
@@ -100,45 +99,53 @@ def plot_accuracies(train_acc, val_acc):
 
     return plot
 
-
 # Architecture of the model
 
-class MLP(nn.Module):
-    '''
-    Multi-layer perceptron model with BatchNorm
+class VGG_11(nn.Module):
+    def __init__(self, in_channels, num_classes):
+        super(VGG_11, self).__init__()
 
-    Activation function: ReLU
-    Output activation function: Softmax
-    '''
-    def __init__(self, arch, in_size, out_size):
-        super(MLP, self).__init__()
+        self.in_channels = in_channels
+        self.num_classes = num_classes
 
-        self.sequence  = self.get_layers(arch, in_size, out_size)
-        self.fc = nn.Sequential(*self.sequence)
-        self.softmax = nn.Softmax(dim=1)
+        self.conv_layers = self.create_conv_layers(ARCH)
+
+        self.fcs = nn.Sequential(
+            nn.Linear(512 * 1 * 1, 4096),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.Linear(4096, 4096),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.Linear(4096, self.num_classes)
+        )
 
     def forward(self, x):
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        x = self.softmax(x)
+        x = self.conv_layers(x)
+        x = x.reshape(x.shape[0], -1)
+        x = self.fcs(x)
+
         return x
-    
-    def get_layers(self, arch, in_size, out_size):
-        '''
-        Returns a list of layers for the model
-        '''
+
+    def create_conv_layers(self, architecture):
         layers = []
-        layers.append(nn.Linear(in_features=in_size, out_features=arch[0]))
-        layers.append(nn.BatchNorm1d(arch[0]))
-        layers.append(nn.ReLU())
-        for i in range(1, len(arch)):
-            layers.append(nn.Linear(in_features=arch[i-1], out_features=arch[i]))
-            layers.append(nn.BatchNorm1d(arch[i]))
-            layers.append(nn.ReLU())
-        layers.append(nn.Linear(in_features=arch[-1], out_features=out_size))
+        in_channels = self.in_channels
 
-        return layers
+        for x in architecture:
+            if type(x) == int:
+                out_channels = x
 
+                layers += [
+                    nn.Conv2d(in_channels, out_channels, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+                    nn.BatchNorm2d(x),
+                    nn.ReLU()
+                ]
+
+                in_channels = x
+            elif x == 'M':
+                layers += [nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))]
+
+        return nn.Sequential(*layers)
 
 def get_accuracy(model: nn.Module, data_loader: dataloader.DataLoader, device: torch.device):
     '''
@@ -156,7 +163,6 @@ def get_accuracy(model: nn.Module, data_loader: dataloader.DataLoader, device: t
 
     return correct / total
 
-
 def get_predicted_labels(model: nn.Module, data_loader: dataloader.DataLoader, device: torch.device):
     '''
     Get the predicted labels of the model on the data_loader
@@ -170,7 +176,6 @@ def get_predicted_labels(model: nn.Module, data_loader: dataloader.DataLoader, d
             labels.append(predicted)
 
     return torch.cat(labels)
-
 
 # Training the model
 
@@ -242,7 +247,6 @@ def train(configs, train_loader: dataloader.DataLoader, val_loader: dataloader.D
     
     return model, configs, train_accuracies, val_accuracies
 
-
 sweep_config = {
     'method': 'bayes',
     'metric': {
@@ -259,15 +263,11 @@ sweep_config = {
         'num_epochs': {
             'values': [10]
         },
-        'batch_norm': {
-            'values': [True]
-        },
         'momentum': {
             'values': [0.87, 0.9, 0.93, 0.99]
         },
     }
 }
-
 
 sweep_id = wandb.sweep(sweep_config, project=PROJECT_NAME, entity=PROJECT_ENTITY)
 
@@ -278,15 +278,14 @@ def train_sweep():
         'num_epochs': wandb.config.num_epochs,
         'batch_size': wandb.config.batch_size,
         'learning_rate': wandb.config.learning_rate,
-        'batch_norm': wandb.config.batch_norm,
         'momentum': wandb.config.momentum,
 
         'wandb_log': True
     }
 
-    run.name = f"lr={configs['learning_rate']}_bs={configs['batch_size']}_epochs={configs['num_epochs']}_bn={configs['batch_norm']}_r{np.random.randint(0, 1000)}"
+    run.name = f"lr={configs['learning_rate']}_bs={configs['batch_size']}_epochs={configs['num_epochs']}_r{np.random.randint(0, 1000)}"
 
-    model = MLP(ARCH, 3*32*32, 10).to(device)
+    model = VGG_11(in_channels=3, num_classes=10).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=configs['learning_rate'], momentum=configs['momentum'])
     
@@ -308,6 +307,5 @@ def train_sweep():
         wandb.finish()
 
     return test_accuracy
-
 
 wandb.agent(sweep_id, train_sweep, count=50)
