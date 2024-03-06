@@ -308,4 +308,4 @@ def train_sweep():
 
     return test_accuracy
 
-wandb.agent(sweep_id, train_sweep, count=50)
+wandb.agent(sweep_id, train_sweep, count=100)
